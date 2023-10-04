@@ -1,0 +1,136 @@
+#!/bin/bash
+
+# Command version
+VERSION="v0.1.0"
+
+# Function to display command usage
+usage() {
+    echo "Usage: internsctl [options] <command>"
+    echo "Options:"
+    echo "  --help         Show this help message"
+    echo "  --version      Show version information"
+    echo ""
+    echo "Commands:"
+    echo "  cpu getinfo    Get CPU information (similar to lscpu)"
+    echo "  memory getinfo Get memory information (similar to free)"
+    echo "  user create    Create a new user with home directory"
+    echo "  user list      List regular users"
+    echo "  user list --sudo-only  List users with sudo permissions"
+    echo "  file getinfo   Get information about a file"
+    echo ""
+    echo "File options (for 'file getinfo' command):"
+    echo "  --size, -s         Print file size"
+    echo "  --permissions, -p  Print file permissions"
+    echo "  --owner, -o        Print file owner"
+    echo "  --last-modified, -m  Print last modified time"
+    echo ""
+    exit 1
+}
+
+# Function to get CPU information
+get_cpu_info() {
+    lscpu
+}
+
+# Function to get memory information
+get_memory_info() {
+    free
+}
+
+# Function to create a new user
+create_user() {
+    if [ $# -eq 0 ]; then
+        echo "Usage: internsctl user create <username>"
+        exit 1
+    fi
+    username="$1"
+    sudo useradd -m "$username"
+    echo "User '$username' created with home directory."
+}
+
+# Function to list users
+list_users() {
+    if [ "$1" = "--sudo-only" ]; then
+        getent group sudo | cut -d: -f4 | tr ',' '\n'
+    else
+        getent passwd | cut -d: -f1
+    fi
+}
+
+# Function to get file information
+get_file_info() {
+    local filename="$1"
+    if [ ! -e "$filename" ]; then
+        echo "File not found: $filename"
+        exit 1
+    fi
+
+    if [ $# -eq 1 ]; then
+        # Display full file information
+        stat "$filename"
+    else
+        # Display specific file information based on options
+        while [ $# -gt 1 ]; do
+            case "$2" in
+                --size|-s)
+                    stat -c "%s" "$filename"
+                    ;;
+                --permissions|-p)
+                    stat -c "%A" "$filename"
+                    ;;
+                --owner|-o)
+                    stat -c "%U" "$filename"
+                    ;;
+                --last-modified|-m)
+                    stat -c "%y" "$filename"
+                    ;;
+                *)
+                    echo "Invalid option: $2"
+                    usage
+                    ;;
+            esac
+            shift 2
+        done
+    fi
+}
+
+# Main script logic
+case "$1" in
+    cpu)
+        get_cpu_info
+        ;;
+    memory)
+        get_memory_info
+        ;;
+    user)
+        shift
+        case "$1" in
+            create)
+                shift
+                create_user "$@"
+                ;;
+            list)
+                shift
+                list_users "$@"
+                ;;
+            *)
+                echo "Invalid user command: $1"
+                usage
+                ;;
+        esac
+        ;;
+    file)
+        shift
+        get_file_info "$@"
+        ;;
+    --help)
+        usage
+        ;;
+    --version)
+        echo "internsctl $VERSION"
+        ;;
+    *)
+        echo "Invalid command: $1"
+        usage
+        ;;
+esac
